@@ -1,0 +1,104 @@
+//@version=5
+indicator("MSP Traders: Candlestick Patterns", shorttitle = "MSP Traders: candles", overlay=true)
+
+C_DownTrend = true
+C_UpTrend = true
+var trendRule1 = "SMA50"
+var trendRule2 = "SMA50, SMA200"
+var trendRule = input.string(trendRule1, "Detect Trend Based On", options=[trendRule1, trendRule2, "No detection"])
+
+if trendRule == trendRule1
+	priceAvg = ta.sma(close, 50)
+	C_DownTrend := close < priceAvg
+	C_UpTrend := close > priceAvg
+
+if trendRule == trendRule2
+	sma200 = ta.sma(close, 200)
+	sma50 = ta.sma(close, 50)
+	C_DownTrend := close < sma50 and sma50 < sma200
+	C_UpTrend := close > sma50 and sma50 > sma200
+C_Len = 14 // ta.ema depth for bodyAvg
+C_ShadowPercent = 5.0 // size of shadows
+C_ShadowEqualsPercent = 100.0
+C_DojiBodyPercent = 5.0
+C_Factor = 2.0 // shows the number of times the shadow dominates the candlestick body
+
+C_BodyHi = math.max(close, open)
+C_BodyLo = math.min(close, open)
+C_Body = C_BodyHi - C_BodyLo
+C_BodyAvg = ta.ema(C_Body, C_Len)
+C_SmallBody = C_Body < C_BodyAvg
+C_LongBody = C_Body > C_BodyAvg
+C_UpShadow = high - C_BodyHi
+C_DnShadow = C_BodyLo - low
+C_HasUpShadow = C_UpShadow > C_ShadowPercent / 100 * C_Body
+C_HasDnShadow = C_DnShadow > C_ShadowPercent / 100 * C_Body
+C_WhiteBody = open < close
+C_BlackBody = open > close
+C_Range = high-low
+C_IsInsideBar = C_BodyHi[1] > C_BodyHi and C_BodyLo[1] < C_BodyLo
+C_BodyMiddle = C_Body / 2 + C_BodyLo
+C_ShadowEquals = C_UpShadow == C_DnShadow or (math.abs(C_UpShadow - C_DnShadow) / C_DnShadow * 100) < C_ShadowEqualsPercent and (math.abs(C_DnShadow - C_UpShadow) / C_UpShadow * 100) < C_ShadowEqualsPercent
+C_IsDojiBody = C_Range > 0 and C_Body <= C_Range * C_DojiBodyPercent / 100
+C_Doji = C_IsDojiBody and C_ShadowEquals
+
+patternLabelPosLow = low - (ta.atr(30) * 0.6)
+patternLabelPosHigh = high + (ta.atr(30) * 0.6)
+
+label_color_bearish_harami = input(color.red, "Label Color Bearish Harami")
+C_HaramiBearishNumberOfCandles = 2
+C_HaramiBearish = C_LongBody[1] and C_WhiteBody[1] and C_UpTrend[1] and C_BlackBody and C_SmallBody and high <= C_BodyHi[1] and low >= C_BodyLo[1]
+alertcondition(C_HaramiBearish, title = "New pattern detected", message = "New Harami – Bearish pattern detected")
+if C_HaramiBearish
+    var ttBearishHarami = "Harami\nThis is a two-day candlestick pattern with a small, red-bodied candle that is entirely encompassed within the body that was once a green-bodied candle."
+    label.new(bar_index, patternLabelPosHigh, text="BH", style=label.style_label_down, color = label_color_bearish_harami, textcolor=color.white, tooltip = ttBearishHarami)
+bgcolor(ta.highest(C_HaramiBearish?1:0, C_HaramiBearishNumberOfCandles)!=0 ? color.new(color.red, 90) : na, offset=-(C_HaramiBearishNumberOfCandles-1))
+
+label_color_bullish_harami = input(color.blue, "Label Color Bullish Harami")
+C_HaramiBullishNumberOfCandles = 2
+C_HaramiBullish = C_LongBody[1] and C_BlackBody[1] and C_DownTrend[1] and C_WhiteBody and C_SmallBody and high <= C_BodyHi[1] and low >= C_BodyLo[1]
+alertcondition(C_HaramiBullish, title = "New pattern detected", message = "New Harami – Bullish pattern detected")
+if C_HaramiBullish
+    var ttBullishHarami = "Harami\nThis two-day candlestick pattern consists of a small-bodied green candle that is entirely encompassed within the body of what was once a red-bodied candle."
+    label.new(bar_index, patternLabelPosLow, text="BH", style=label.style_label_up, color = label_color_bullish_harami, textcolor=color.white, tooltip = ttBullishHarami)
+bgcolor(ta.highest(C_HaramiBullish?1:0, C_HaramiBullishNumberOfCandles)!=0 ? color.new(color.blue, 90) : na, offset=-(C_HaramiBullishNumberOfCandles-1))
+
+label_color_bearish_engulfing = input(color.red, "Label Color Bearish")
+C_EngulfingBearishNumberOfCandles = 2
+C_EngulfingBearish = C_UpTrend and C_BlackBody and C_LongBody and C_WhiteBody[1] and C_SmallBody[1] and close <= open[1] and open >= close[1] and ( close < open[1] or open > close[1] )
+alertcondition(C_EngulfingBearish, title = "New pattern detected", message = "New Engulfing – Bearish pattern detected")
+if C_EngulfingBearish
+    var ttBearishEngulfing = "Engulfing\nAt the end of a given uptrend, a reversal pattern will most likely appear. During the first day, this candlestick pattern uses a small body. It is then followed by a day where the candle body fully overtakes the body from the day before it and closes in the trend’s opposite direction. Although similar to the outside reversal chart pattern, it is not essential for this pattern to fully overtake the range (high to low), rather only the open and the close."
+    label.new(bar_index, patternLabelPosHigh, text="BE", style=label.style_label_down, color = label_color_bearish_engulfing, textcolor=color.white, tooltip = ttBearishEngulfing)
+bgcolor(ta.highest(C_EngulfingBearish?1:0, C_EngulfingBearishNumberOfCandles)!=0 ? color.new(color.red, 90) : na, offset=-(C_EngulfingBearishNumberOfCandles-1))
+
+label_color_bullish_engulfing = input(color.blue, "Label Color Bullish Engulfing")
+C_EngulfingBullishNumberOfCandles = 2
+C_EngulfingBullish = C_DownTrend and C_WhiteBody and C_LongBody and C_BlackBody[1] and C_SmallBody[1] and close >= open[1] and open <= close[1] and ( close > open[1] or open < close[1] )
+alertcondition(C_EngulfingBullish, title = "New pattern detected", message = "New Engulfing – Bullish pattern detected")
+if C_EngulfingBullish
+    var ttBullishEngulfing = "Engulfing\nAt the end of a given downward trend, there will most likely be a reversal pattern. To distinguish the first day, this candlestick pattern uses a small body, followed by a day where the candle body fully overtakes the body from the day before, and closes in the trend’s opposite direction. Although similar to the outside reversal chart pattern, it is not essential for this pattern to completely overtake the range (high to low), rather only the open and the close."
+    label.new(bar_index, patternLabelPosLow, text="BE", style=label.style_label_up, color = label_color_bullish_engulfing, textcolor=color.white, tooltip = ttBullishEngulfing)
+bgcolor(ta.highest(C_EngulfingBullish?1:0, C_EngulfingBullishNumberOfCandles)!=0 ? color.new(color.blue, 90) : na, offset=-(C_EngulfingBullishNumberOfCandles-1))
+
+label_color_bearish_DCC = input(color.red, "Label Color Bearish DCC")
+C_DarkCloudCoverBearishNumberOfCandles = 2
+C_DarkCloudCoverBearish = false
+if (C_UpTrend[1] and C_WhiteBody[1] and C_LongBody[1]) and (C_BlackBody and open >= high[1] and  close < C_BodyMiddle[1] and close > open[1])
+	C_DarkCloudCoverBearish := true
+alertcondition(C_DarkCloudCoverBearish, title = "New pattern detected", message = "New Dark Cloud Cover – Bearish pattern detected")
+if C_DarkCloudCoverBearish
+    var ttBearishDarkCloudCover = "Dark Cloud Cover\nDark Cloud Cover is a two-candle bearish reversal candlestick pattern found in an uptrend. The first candle is green and has a larger than average body. The second candle is red and opens above the high of the prior candle, creating a gap, and then closes below the midpoint of the first candle. The pattern shows a possible shift in the momentum from the upside to the downside, indicating that a reversal might happen soon."
+    label.new(bar_index, patternLabelPosHigh, text="DCC", style=label.style_label_down, color = label_color_bearish_DCC, textcolor=color.white, tooltip = ttBearishDarkCloudCover)
+bgcolor(ta.highest(C_DarkCloudCoverBearish?1:0, C_DarkCloudCoverBearishNumberOfCandles)!=0 ? color.new(color.red, 90) : na, offset=-(C_DarkCloudCoverBearishNumberOfCandles-1))
+
+label_color_bullish_piercing = input(color.blue, "Label Color Bullish Piercing")
+C_PiercingBullishNumberOfCandles = 2
+C_PiercingBullish = false
+if (C_DownTrend[1] and C_BlackBody[1] and C_LongBody[1]) and (C_WhiteBody and open <= low[1] and close > C_BodyMiddle[1] and close < open[1])
+	C_PiercingBullish := true
+alertcondition(C_PiercingBullish, title = "New pattern detected", message = "New Piercing – Bullish pattern detected")
+if C_PiercingBullish
+    var ttBullishPiercing = "Piercing\nPiercing is a two-candle bullish reversal candlestick pattern found in a downtrend. The first candle is red and has a larger than average body. The second candle is green and opens below the low of the prior candle, creating a gap, and then closes above the midpoint of the first candle. The pattern shows a possible shift in the momentum from the downside to the upside, indicating that a reversal might happen soon."
+    label.new(bar_index, patternLabelPosLow, text="P", style=label.style_label_up, color = label_color_bullish_piercing, textcolor=color.white, tooltip = ttBullishPiercing)
+bgcolor(ta.highest(C_PiercingBullish?1:0, C_PiercingBullishNumberOfCandles)!=0 ? color.new(color.blue, 90) : na, offset=-(C_PiercingBullishNumberOfCandles-1))
